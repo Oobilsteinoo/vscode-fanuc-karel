@@ -229,7 +229,9 @@ fun triggerSummary(rule: Rule, cfg: Config): String {
         val c = rule.conditions
         if (c.requireWirelessCharging) add("charge sans fil")
         if (c.requireAnyCharging) add("en charge")
+        if (c.requireNotCharging) add("pas en charge")
         if (c.requireCarBluetooth) add("BT voiture")
+        if (c.requireNoCarBluetooth) add("BT voiture déconnecté")
         if (c.requireScreenOff) add("écran éteint")
         if (c.requireScreenOn) add("écran allumé")
         if (c.requireWifi) add("Wi-Fi")
@@ -244,6 +246,7 @@ fun triggerSummary(rule: Rule, cfg: Config): String {
 private fun AddRuleDialog(onDismiss: () -> Unit, onCreate: (Rule) -> Unit) {
     val templates = listOf(
         "car" to "Routine voiture (charge sans fil + Bluetooth)",
+        "exit" to "Sortie de voiture (Bluetooth déconnecté)",
         "wake" to "Réveil d'applis au départ en voiture",
         "periodic" to "Réveil périodique d'applis",
         "blank" to "Règle vide"
@@ -256,6 +259,7 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onCreate: (Rule) -> Unit) {
             onCreate(
                 when (key) {
                     "car" -> Defaults.carRoutine()
+                    "exit" -> Defaults.carExit()
                     "wake" -> Defaults.wakeOnCar()
                     "periodic" -> Defaults.wakePeriodic()
                     else -> Defaults.blank()

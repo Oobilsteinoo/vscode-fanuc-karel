@@ -8,7 +8,7 @@ object Defaults {
     fun newId(): String = UUID.randomUUID().toString()
 
     fun initialConfig(): Config = Config(
-        rules = listOf(carRoutine(), wakeOnCar(), wakePeriodic().copy(enabled = false)),
+        rules = listOf(carRoutine(), carExit(), wakeOnCar(), wakePeriodic().copy(enabled = false)),
         carDevices = emptyList(),
         firstRunDone = false
     )
@@ -19,6 +19,21 @@ object Defaults {
         name = "Routine voiture",
         enabled = true,
         trigger = Trigger(type = TriggerType.CAR_MODE_START),
+        conditions = Conditions(),
+        actions = emptyList(),
+        cooldownMinutes = 2
+    )
+
+    /**
+     * Sortie de voiture : le Bluetooth du véhicule se déconnecte quand on coupe le contact.
+     * Déclencheur volontairement basé sur le Bluetooth seul, et non sur la fin du « mode voiture » :
+     * il se déclenche même si le téléphone n'était pas posé sur le chargeur pendant le trajet.
+     */
+    fun carExit(): Rule = Rule(
+        id = newId(),
+        name = "Sortie de voiture",
+        enabled = true,
+        trigger = Trigger(type = TriggerType.BT_DISCONNECTED),
         conditions = Conditions(),
         actions = emptyList(),
         cooldownMinutes = 2

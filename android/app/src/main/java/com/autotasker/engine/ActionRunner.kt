@@ -1,9 +1,11 @@
 package com.autotasker.engine
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.view.KeyEvent
 import com.autotasker.core.Apps
 import com.autotasker.data.Action
@@ -41,6 +43,8 @@ object ActionRunner {
                 goHome(context)
             }
 
+            ActionType.CLOSE_APP -> closeApp(context, action.packageName)
+
             ActionType.GO_HOME -> goHome(context)
 
             ActionType.OPEN_URL -> {
@@ -51,7 +55,9 @@ object ActionRunner {
                 }
             }
 
-            ActionType.MEDIA_PLAY -> mediaPlay(context)
+            ActionType.MEDIA_PLAY -> mediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY)
+
+            ActionType.MEDIA_PAUSE -> mediaKey(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
         }
     }
 
@@ -66,6 +72,27 @@ object ActionRunner {
         context.startActivity(intent)
     }
 
+    /**
+     * Demande à Android de tuer les processus d'arrière-plan d'une application.
+     *
+     * Attention : depuis Android 14, `killBackgroundProcesses` n'agit plus que sur l'appli
+     * appelante — l'appel devient silencieusement sans effet sur les autres. Il n'existe aucune
+     * API publique pour fermer une application tierce sans service d'accessibilité. Sur ces
+     * versions, préférez « Retour à l'accueil » (qui met l'appli en arrière-plan) et
+     * « Pause média » (qui coupe réellement la lecture).
+     */
+    private fun closeApp(context: Context, packageName: String) {
+        if (packageName.isBlank()) return
+        val am = context.getSystemService(ActivityManager::class.java) ?: return
+        am.killBackgroundProcesses(packageName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            EventLog.add(
+                "ℹ Fermeture de ${Apps.labelFor(context, packageName)} demandée, " +
+                    "mais Android 14+ l'ignore pour les applis tierces"
+            )
+        }
+    }
+
     private fun goHome(context: Context) {
         val intent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_HOME)
@@ -73,9 +100,9 @@ object ActionRunner {
         context.startActivity(intent)
     }
 
-    private fun mediaPlay(context: Context) {
+    private fun mediaKey(context: Context, keyCode: Int) {
         val am = context.getSystemService(AudioManager::class.java) ?: return
-        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY))
-        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY))
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
 }

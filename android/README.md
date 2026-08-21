@@ -95,6 +95,22 @@ diffusions Bluetooth et charge ne seront jamais reçues.
 Le *délai anti-répétition* (2 min par défaut) évite qu'un Bluetooth capricieux relance
 la séquence à chaque micro-coupure.
 
+### Sortie de voiture
+
+La règle **Sortie de voiture** est pré-créée, déclenchée par *Bluetooth déconnecté* sur les
+appareils de la liste voiture. Ce déclencheur est délibérément basé sur le Bluetooth seul et
+non sur la fin du « mode voiture » : il fonctionne même si le téléphone n'était pas posé sur
+le chargeur pendant le trajet.
+
+Exemple de séquence : `Pause média` — `Fermer` Waze — `Fermer` Android Auto — `Retour à l'accueil`.
+
+Pour une règle qui ne doit s'exécuter qu'une fois vraiment sorti du véhicule, ajoutez les
+conditions **Bluetooth voiture déconnecté** et **Pas en charge** : elles filtrent les
+déconnexions parasites survenant moteur tournant.
+
+Le déclencheur *Fin charge sans fil / Bluetooth voiture* (`CAR_MODE_END`) reste disponible si
+vous préférez exiger que les deux signaux retombent.
+
 ### Tâche 2 — réveiller les applis fantômes
 
 « Réveiller » = ouvrir l'application, la laisser au premier plan quelques secondes
@@ -126,10 +142,20 @@ Autres déclencheurs disponibles pour ce cas : *Wi-Fi perdu* (sortie de la maiso
 |---|---|
 | `Lancer une application` | Ouvre l'appli et la laisse au premier plan |
 | `Réveiller une application` | Ouvre l'appli, attend N secondes, revient à l'accueil |
+| `Fermer une application` | Demande la fin de ses processus d'arrière-plan — **voir la limite ci-dessous** |
 | `Attendre` | Pause entre deux actions |
-| `Retour à l'accueil` | Envoie l'intent HOME |
+| `Retour à l'accueil` | Envoie l'intent HOME : met l'appli au premier plan en arrière-plan |
 | `Ouvrir un lien` | URL ou lien d'appli (`https://`, `dscam://`…) |
 | `Lecture média` | Touche « Play » (reprend Spotify, etc.) |
+| `Pause média` | Touche « Pause » (coupe la musique en sortant de voiture) |
+
+> **Fermer une application, honnêtement.** Android n'expose aucune API publique permettant de
+> terminer une application tierce. `Fermer une application` appelle `killBackgroundProcesses`,
+> qui fonctionne jusqu'à Android 13 mais que **Android 14 a restreint à l'appli appelante** :
+> sur les versions récentes l'appel est silencieusement ignoré (le journal le signale).
+> Pour obtenir l'effet recherché en sortant de voiture, utilisez plutôt `Pause média` — qui
+> coupe réellement la lecture — et `Retour à l'accueil`, qui bascule l'appli au premier plan
+> en arrière-plan où Android la recyclera de lui-même.
 
 ## Déclencheurs et conditions
 
@@ -138,7 +164,11 @@ précis ou n'importe lequel de la liste voiture), début/fin de charge sans fil,
 de charge, Wi-Fi perdu/rejoint, périodique, démarrage du téléphone, manuel.
 
 Conditions (filtres cumulatifs vérifiés au moment du déclenchement) : charge sans fil,
-en charge, Bluetooth voiture connecté, écran éteint, écran allumé, Wi-Fi, hors Wi-Fi.
+en charge, **pas en charge**, Bluetooth voiture connecté, **Bluetooth voiture déconnecté**,
+écran éteint, écran allumé, Wi-Fi, hors Wi-Fi, **plage horaire** (passage de minuit géré).
+
+Les conditions contradictoires se désactivent mutuellement dans l'éditeur : cocher « pas en
+charge » décoche « en charge », etc.
 
 Le **journal** (icône ⓘ) trace chaque déclenchement, chaque exécution, et surtout
 chaque règle *écartée* avec la raison (conditions non remplies, délai anti-répétition,
@@ -160,6 +190,9 @@ aucune action) — c'est le premier endroit à regarder quand « ça n'a pas mar
 - **Perte de Wi-Fi détectée avec retard.** Android ne diffuse plus le changement d'état
   réseau aux receivers déclarés dans le manifeste. La transition est donc constatée au
   prochain événement (charge, Bluetooth) ou au prochain réveil périodique.
+- **Fermer une application est impossible sur Android 14+.** Détaillé plus haut : aucune API
+  publique ne le permet sans service d'accessibilité, lequel serait résident en mémoire et
+  irait à l'encontre de l'objectif de consommation minimale.
 - **Lancement en arrière-plan.** Si l'autorisation d'affichage par-dessus les autres
   applis manque, ou si le constructeur bloque le démarrage automatique, les séquences ne
   s'exécuteront pas. Un repli via WorkManager existe si Android refuse le service de

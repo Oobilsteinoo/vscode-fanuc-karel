@@ -41,6 +41,8 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
     var showAddAction by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var appPickerFor by remember { mutableStateOf<ActionType?>(null) }
+    var showStartHourPicker by remember { mutableStateOf(false) }
+    var showEndHourPicker by remember { mutableStateOf(false) }
     var delayPickerIndex by remember { mutableStateOf(-1) }
 
     fun mutate(block: (Rule) -> Rule) = Store.updateRule(rule.id, block)
@@ -126,15 +128,72 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
                 subtitle = "Filtres vérifiés au moment du déclenchement. Toutes doivent être vraies."
             ) {
                 val c = rule.conditions
+
                 SwitchRow("Charge sans fil en cours", c.requireWirelessCharging) { v ->
-                    mutate { it.copy(conditions = it.conditions.copy(requireWirelessCharging = v)) }
+                    mutate {
+                        it.copy(
+                            conditions = it.conditions.copy(
+                                requireWirelessCharging = v,
+                                requireNotCharging = if (v) false else it.conditions.requireNotCharging
+                            )
+                        )
+                    }
                 }
                 SwitchRow("En charge (filaire ou sans fil)", c.requireAnyCharging) { v ->
-                    mutate { it.copy(conditions = it.conditions.copy(requireAnyCharging = v)) }
+                    mutate {
+                        it.copy(
+                            conditions = it.conditions.copy(
+                                requireAnyCharging = v,
+                                requireNotCharging = if (v) false else it.conditions.requireNotCharging
+                            )
+                        )
+                    }
                 }
+                SwitchRow(
+                    "Pas en charge",
+                    c.requireNotCharging,
+                    "Le téléphone a quitté le chargeur : typique d'une sortie de voiture."
+                ) { v ->
+                    mutate {
+                        it.copy(
+                            conditions = it.conditions.copy(
+                                requireNotCharging = v,
+                                requireWirelessCharging = if (v) false else it.conditions.requireWirelessCharging,
+                                requireAnyCharging = if (v) false else it.conditions.requireAnyCharging
+                            )
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
                 SwitchRow("Bluetooth voiture connecté", c.requireCarBluetooth) { v ->
-                    mutate { it.copy(conditions = it.conditions.copy(requireCarBluetooth = v)) }
+                    mutate {
+                        it.copy(
+                            conditions = it.conditions.copy(
+                                requireCarBluetooth = v,
+                                requireNoCarBluetooth = if (v) false else it.conditions.requireNoCarBluetooth
+                            )
+                        )
+                    }
                 }
+                SwitchRow(
+                    "Bluetooth voiture déconnecté",
+                    c.requireNoCarBluetooth,
+                    "Garantit que la règle ne s'exécute qu'une fois vraiment sorti du véhicule."
+                ) { v ->
+                    mutate {
+                        it.copy(
+                            conditions = it.conditions.copy(
+                                requireNoCarBluetooth = v,
+                                requireCarBluetooth = if (v) false else it.conditions.requireCarBluetooth
+                            )
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
                 SwitchRow(
                     "Écran éteint uniquement",
                     c.requireScreenOff,
@@ -183,6 +242,17 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
                         )
                     }
                 }
+
+                HorizontalDivider()
+
+                ValueRow("Plage horaire — début", hourLabel(c.startHour)) { showStartHourPicker = true }
+                ValueRow("Plage horaire — fin", hourLabel(c.endHour)) { showEndHourPicker = true }
+                Text(
+                    "Les deux bornes doivent être définies pour que la contrainte s'applique. " +
+                        "Le passage de minuit est géré (22h → 6h fonctionne).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             SectionCard(
@@ -292,7 +362,8 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
             selected = null,
             onPick = { type ->
                 when (type) {
-                    ActionType.LAUNCH_APP, ActionType.WAKE_APP -> appPickerFor = type
+                    ActionType.LAUNCH_APP, ActionType.WAKE_APP, ActionType.CLOSE_APP ->
+                        appPickerFor = type
                     ActionType.DELAY -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.DELAY, delayMs = 3000))
                     }
@@ -301,6 +372,9 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
                     }
                     ActionType.MEDIA_PLAY -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.MEDIA_PLAY))
+                    }
+                    ActionType.MEDIA_PAUSE -> mutate {
+                        it.copy(actions = it.actions + Action(type = ActionType.MEDIA_PAUSE))
                     }
                     ActionType.OPEN_URL -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.OPEN_URL, url = "https://"))
@@ -356,6 +430,26 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
         }
     }
 
+    if (showStartHourPicker) {
+        ChoiceDialog(
+            title = "Heure de début",
+            options = hourOptions(),
+            selected = rule.conditions.startHour,
+            onPick = { hour -> mutate { it.copy(conditions = it.conditions.copy(startHour = hour)) } },
+            onDismiss = { showStartHourPicker = false }
+        )
+    }
+
+    if (showEndHourPicker) {
+        ChoiceDialog(
+            title = "Heure de fin",
+            options = hourOptions(),
+            selected = rule.conditions.endHour,
+            onPick = { hour -> mutate { it.copy(conditions = it.conditions.copy(endHour = hour)) } },
+            onDismiss = { showEndHourPicker = false }
+        )
+    }
+
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -373,6 +467,11 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
         )
     }
 }
+
+private fun hourLabel(hour: Int): String = if (hour < 0) "aucune" else "${hour}h"
+
+private fun hourOptions(): List<Pair<Int, String>> =
+    listOf(-1 to "Aucune") + (0..23).map { it to "${it}h" }
 
 @Composable
 private fun ActionRow(

@@ -188,7 +188,9 @@ object Engine {
         if (c.isEmpty) return true
         if (c.requireWirelessCharging && !snap.wireless) return false
         if (c.requireAnyCharging && !snap.charging) return false
+        if (c.requireNotCharging && snap.charging) return false
         if (c.requireCarBluetooth && !snap.carBt) return false
+        if (c.requireNoCarBluetooth && snap.carBt) return false
         if (c.requireWifi && !snap.wifi) return false
         if (c.requireNoWifi && snap.wifi) return false
         if (c.requireScreenOff && DeviceState.isScreenOn(context)) return false

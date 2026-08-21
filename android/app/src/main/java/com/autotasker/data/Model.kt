@@ -77,7 +77,9 @@ data class Trigger(
 data class Conditions(
     val requireWirelessCharging: Boolean = false,
     val requireAnyCharging: Boolean = false,
+    val requireNotCharging: Boolean = false,
     val requireCarBluetooth: Boolean = false,
+    val requireNoCarBluetooth: Boolean = false,
     val requireScreenOff: Boolean = false,
     val requireScreenOn: Boolean = false,
     val requireWifi: Boolean = false,
@@ -87,7 +89,8 @@ data class Conditions(
     val endHour: Int = -1
 ) {
     val isEmpty: Boolean
-        get() = !requireWirelessCharging && !requireAnyCharging && !requireCarBluetooth &&
+        get() = !requireWirelessCharging && !requireAnyCharging && !requireNotCharging &&
+            !requireCarBluetooth && !requireNoCarBluetooth &&
             !requireScreenOff && !requireScreenOn && !requireWifi && !requireNoWifi &&
             startHour < 0 && endHour < 0
 }
@@ -108,18 +111,33 @@ enum class ActionType {
     /** Ouvre une URL (ou un lien d'appli type `dscam://`). */
     OPEN_URL,
 
+    /**
+     * Ferme une application : demande à Android de tuer ses processus d'arrière-plan.
+     * Voir les limites dans [Action.describe] et le README — sans effet sur Android 14+.
+     */
+    CLOSE_APP,
+
     /** Envoie la touche média « Lecture » (reprend Spotify / Waze audio, etc.). */
-    MEDIA_PLAY;
+    MEDIA_PLAY,
+
+    /** Envoie la touche média « Pause » (coupe la musique en sortant de voiture). */
+    MEDIA_PAUSE;
 
     val label: String
         get() = when (this) {
             LAUNCH_APP -> "Lancer une application"
             WAKE_APP -> "Réveiller une application"
+            CLOSE_APP -> "Fermer une application"
             DELAY -> "Attendre"
             GO_HOME -> "Retour à l'accueil"
             OPEN_URL -> "Ouvrir un lien"
             MEDIA_PLAY -> "Lecture média"
+            MEDIA_PAUSE -> "Pause média"
         }
+
+    /** L'action porte sur une application à choisir. */
+    val needsApp: Boolean
+        get() = this == LAUNCH_APP || this == WAKE_APP || this == CLOSE_APP
 }
 
 @Serializable
@@ -134,10 +152,12 @@ data class Action(
     fun describe(): String = when (type) {
         ActionType.LAUNCH_APP -> "Lancer ${label.ifBlank { packageName }}"
         ActionType.WAKE_APP -> "Réveiller ${label.ifBlank { packageName }} (${delayMs / 1000}s)"
+        ActionType.CLOSE_APP -> "Fermer ${label.ifBlank { packageName }}"
         ActionType.DELAY -> "Attendre ${delayMs / 1000.0} s"
         ActionType.GO_HOME -> "Retour à l'accueil"
         ActionType.OPEN_URL -> "Ouvrir $url"
         ActionType.MEDIA_PLAY -> "Lecture média"
+        ActionType.MEDIA_PAUSE -> "Pause média"
     }
 }
 
