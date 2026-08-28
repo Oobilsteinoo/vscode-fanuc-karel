@@ -13,7 +13,18 @@ import com.autotasker.service.RoutineService
 import kotlinx.serialization.Serializable
 import java.util.Calendar
 
-enum class EventKind { POWER, BLUETOOTH, BOOT, PERIODIC, MANUAL }
+enum class EventKind {
+    POWER, BLUETOOTH, BOOT, PERIODIC, MANUAL;
+
+    val label: String
+        get() = when (this) {
+            POWER -> "chargeur"
+            BLUETOOTH -> "Bluetooth"
+            BOOT -> "démarrage"
+            PERIODIC -> "périodique"
+            MANUAL -> "manuel"
+        }
+}
 
 data class SystemEvent(
     val kind: EventKind,
@@ -43,6 +54,12 @@ object Engine {
         val ssid: String = ""
     ) {
         val carMode: Boolean get() = wireless && carBt
+
+        fun describe(): String = buildString {
+            append(if (wireless) "sans fil" else if (charging) "en charge" else "sur batterie")
+            append(if (carBt) ", BT voiture" else ", pas de BT voiture")
+            append(if (wifi) ", Wi-Fi" else ", hors Wi-Fi")
+        }
     }
 
     fun snapshot(context: Context, cfg: Config): Snapshot = Snapshot(
@@ -80,7 +97,13 @@ object Engine {
         saveSnapshot(current)
 
         val fired = firedTriggers(previous, current, event)
-        if (fired.isEmpty()) return
+
+        if (fired.isEmpty()) {
+            if (cfg.verboseLog) {
+                EventLog.add("Réveil (${event.kind.label}) · ${current.describe()} · aucun changement")
+            }
+            return
+        }
 
         val matching = cfg.rules.filter { rule ->
             rule.enabled &&
@@ -93,6 +116,14 @@ object Engine {
         if (matching.isEmpty()) {
             // Trace utile pour comprendre pourquoi « ça n'a pas marché ».
             val blocked = cfg.rules.filter { it.enabled && matchesTrigger(it, fired, event, cfg, current) }
+            if (blocked.isEmpty()) {
+                if (cfg.verboseLog) {
+                    EventLog.add(
+                        "Réveil (${event.kind.label}) · ${fired.joinToString { it.label }} · " +
+                            "aucune règle sur ce déclencheur"
+                    )
+                }
+            }
             if (blocked.isNotEmpty()) {
                 val names = blocked.joinToString(", ") { rule ->
                     val why = when {

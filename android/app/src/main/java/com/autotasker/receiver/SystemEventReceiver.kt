@@ -12,6 +12,7 @@ import com.autotasker.engine.Engine
 import com.autotasker.engine.EventKind
 import com.autotasker.engine.SystemEvent
 import com.autotasker.work.Scheduler
+import com.autotasker.work.WatchManager
 
 /**
  * Unique point d'écoute de l'appli.
@@ -57,6 +58,9 @@ class SystemEventReceiver : BroadcastReceiver() {
                 BtDevices.clearConnected()
                 Engine.resetSnapshot()
                 Scheduler.sync(ctx)
+                // Autorisé ici : BOOT_COMPLETED fait partie des exemptions permettant de
+                // démarrer un service de premier plan depuis l'arrière-plan.
+                WatchManager.sync(ctx)
                 Engine.handle(ctx, SystemEvent(EventKind.BOOT))
             }
         }

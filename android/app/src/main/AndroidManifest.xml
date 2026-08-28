@@ -67,10 +67,24 @@
                 android:value="Exécution de séquences d'automatisation définies par l'utilisateur (lancement d'applications) déclenchées par la charge sans fil et le Bluetooth du véhicule." />
         </service>
 
+        <service
+            android:name=".service.PowerWatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Écoute des branchements et débranchements du chargeur, qu'Android n'autorise pas à recevoir via un receiver déclaré dans le manifeste." />
+        </service>
+
         <receiver
             android:name=".receiver.SystemEventReceiver"
             android:exported="true"
             android:directBootAware="false">
+            <!--
+                Conservé par acquit de conscience : ces deux actions ne figurent PAS sur la liste
+                des diffusions implicites encore autorisées dans le manifeste depuis Android 8, et
+                ne sont donc jamais délivrées ici. C'est PowerWatchService qui les reçoit vraiment.
+            -->
             <intent-filter>
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />

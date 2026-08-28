@@ -18,6 +18,7 @@ import com.autotasker.ui.HomeScreen
 import com.autotasker.ui.LogScreen
 import com.autotasker.ui.RuleEditorScreen
 import com.autotasker.ui.SetupScreen
+import com.autotasker.work.WatchManager
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             runCatching { BtDevices.refreshFromProfiles(applicationContext) }
         }
+        // L'appli est au premier plan : c'est le moment où Android autorise le démarrage
+        // du service de surveillance.
+        runCatching { WatchManager.sync(this) }
     }
 }
 

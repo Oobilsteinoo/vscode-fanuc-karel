@@ -21,6 +21,7 @@ import com.autotasker.data.Rule
 import com.autotasker.data.Store
 import com.autotasker.data.TriggerType
 import com.autotasker.work.Scheduler
+import com.autotasker.work.WatchManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,7 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
 
     fun finish() {
         Scheduler.sync(context)
+        WatchManager.sync(context)
         onBack()
     }
 

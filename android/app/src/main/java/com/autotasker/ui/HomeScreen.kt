@@ -24,6 +24,7 @@ import com.autotasker.data.Store
 import com.autotasker.data.TriggerType
 import com.autotasker.engine.Engine
 import com.autotasker.work.Scheduler
+import com.autotasker.work.WatchManager
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,6 +82,7 @@ fun HomeScreen(onEdit: (String) -> Unit, onLogs: () -> Unit, onSetup: () -> Unit
             onCreate = { rule ->
                 Store.update { it.copy(rules = it.rules + rule) }
                 Scheduler.sync(context)
+                WatchManager.sync(context)
                 onEdit(rule.id)
             }
         )
@@ -174,6 +176,7 @@ private fun RuleCard(rule: Rule, cfg: Config, onEdit: () -> Unit) {
                     onCheckedChange = { enabled ->
                         Store.updateRule(rule.id) { it.copy(enabled = enabled) }
                         Scheduler.sync(context)
+                        WatchManager.sync(context)
                     }
                 )
             }

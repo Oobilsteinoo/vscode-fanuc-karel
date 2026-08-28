@@ -26,9 +26,18 @@ class App : Application() {
                 enableVibration(false)
             }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_WATCH, "Surveillance du chargeur", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "Android impose cette notification tant que la surveillance du " +
+                    "chargeur est active. Vous pouvez la masquer ici sans désactiver la surveillance."
+                setShowBadge(false)
+                enableVibration(false)
+            }
+        )
     }
 
     companion object {
         const val CH_RUNNING = "routine_running"
+        const val CH_WATCH = "power_watch"
     }
 }

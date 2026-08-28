@@ -11,25 +11,39 @@ en arrière-plan. Deux besoins précis à l'origine :
 
 ---
 
-## Le principe : zéro tâche de fond
+## Le principe : presque zéro tâche de fond
 
-L'appli **n'a aucun service résident, aucun timer, aucune boucle de sondage**.
-Elle est entièrement pilotée par les diffusions que l'OS envoie déjà :
-
-| Événement | Diffusion Android utilisée | Coût |
+| Événement | Mécanisme | Coût |
 |---|---|---|
-| Début / fin de charge | `ACTION_POWER_CONNECTED` / `_DISCONNECTED` | réveil de quelques ms |
-| Bluetooth connecté / déconnecté | `ACL_CONNECTED` / `ACL_DISCONNECTED` | réveil de quelques ms |
+| Bluetooth connecté / déconnecté | `ACL_CONNECTED` / `ACL_DISCONNECTED` déclarés au manifeste | réveil de quelques ms |
 | Redémarrage du téléphone | `BOOT_COMPLETED` | une fois |
 | Réveil périodique *(optionnel)* | WorkManager, ≥ 15 min | groupé avec les autres applis, respecte le Doze |
+| Début / fin de charge | **service d'écoute résident** — voir ci-dessous | notification permanente |
 
-Ces quatre diffusions font partie des rares diffusions implicites encore autorisées
-dans le manifeste depuis Android 8 : le processus est réveillé **au moment exact de
-l'événement**, lit l'état de l'appareil, compare avec l'état précédent, décide, puis
-s'éteint. Entre deux événements, l'appli n'existe pas.
+Les diffusions Bluetooth et de démarrage font partie des rares diffusions implicites
+encore autorisées dans le manifeste depuis Android 8 : le processus est réveillé au
+moment exact de l'événement, lit l'état de l'appareil, compare avec l'état précédent,
+décide, puis s'éteint. Entre deux événements, l'appli n'existe pas.
 
-Un service de premier plan (notification silencieuse) n'est démarré que **pendant**
-l'exécution d'une séquence, soit quelques secondes.
+### L'exception : la charge
+
+`ACTION_POWER_CONNECTED` et `ACTION_POWER_DISCONNECTED` **ne figurent pas** sur la
+[liste des exceptions](https://developer.android.com/develop/background-work/background-tasks/broadcasts/broadcast-exceptions).
+Un receiver déclaré au manifeste pour ces actions n'est **jamais** appelé sur Android 8+.
+La seule façon de les recevoir est de les enregistrer à l'exécution, ce qui suppose un
+processus vivant — d'où `PowerWatchService` et sa notification permanente.
+
+Ce service ne démarre que si au moins une règle activée utilise un déclencheur lié à la
+charge. Une configuration purement Bluetooth ne fait tourner aucun service. Le coût reste
+modéré : le service ne tient aucun wakelock et ne réveille jamais le processeur, il
+maintient seulement deux filtres d'intention — contrairement à une écoute de
+`ACTION_BATTERY_CHANGED`, qui serait notifiée à chaque pourcent.
+
+La notification peut être masquée depuis les réglages Android (appui long → catégorie
+« Surveillance du chargeur ») sans désactiver la surveillance.
+
+Enfin, un service de premier plan éphémère existe **pendant** l'exécution d'une séquence,
+soit quelques secondes.
 
 ### Le moteur
 
@@ -193,6 +207,8 @@ aucune action) — c'est le premier endroit à regarder quand « ça n'a pas mar
 - **Fermer une application est impossible sur Android 14+.** Détaillé plus haut : aucune API
   publique ne le permet sans service d'accessibilité, lequel serait résident en mémoire et
   irait à l'encontre de l'objectif de consommation minimale.
+- **La charge impose un service résident.** Détaillé plus haut. Si vous n'utilisez que des
+  déclencheurs Bluetooth, aucun service ne tourne et l'appli est réellement invisible.
 - **Lancement en arrière-plan.** Si l'autorisation d'affichage par-dessus les autres
   applis manque, ou si le constructeur bloque le démarrage automatique, les séquences ne
   s'exécuteront pas. Un repli via WorkManager existe si Android refuse le service de
@@ -208,10 +224,14 @@ app/src/main/java/com/autotasker/
 ├── core/                      Lectures d'état : batterie, écran, Wi-Fi, Bluetooth, applis
 ├── engine/                    Moteur de règles (photo → différences → règles) et exécuteur
 ├── receiver/                  L'unique BroadcastReceiver du manifeste
-├── service/                   Service de premier plan éphémère (durée d'une séquence)
+├── service/                   Exécution d'une séquence + écoute résidente du chargeur
 ├── work/                      Réveil périodique + repli d'exécution (WorkManager)
 └── ui/                        Écrans Compose (accueil, éditeur, journal, réglages)
 ```
+
+Le **journal détaillé** (activé par défaut, désactivable dans les réglages) consigne aussi
+les réveils sans effet : c'est ce qui permet de distinguer « l'appli n'a jamais été
+réveillée » de « elle a été réveillée mais aucune règle ne correspondait ».
 
 Aucune dépendance réseau, aucune analytique, aucune donnée ne quitte le téléphone :
 la configuration tient dans un unique blob JSON en `SharedPreferences`.

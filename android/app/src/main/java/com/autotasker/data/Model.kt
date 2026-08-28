@@ -181,5 +181,13 @@ data class Config(
     val rules: List<Rule> = emptyList(),
     /** Appareils Bluetooth considérés comme « la voiture ». */
     val carDevices: List<BtDevice> = emptyList(),
+    /**
+     * Autorise le service de surveillance du chargeur. Il ne démarre que si une règle activée
+     * utilise un déclencheur lié à la charge — les configurations purement Bluetooth n'en ont
+     * pas besoin.
+     */
+    val powerWatchEnabled: Boolean = true,
+    /** Journalise aussi les réveils sans effet. Utile pour diagnostiquer, bruyant à l'usage. */
+    val verboseLog: Boolean = true,
     val firstRunDone: Boolean = false
 )

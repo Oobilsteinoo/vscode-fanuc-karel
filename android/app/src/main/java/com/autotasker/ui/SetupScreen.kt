@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.autotasker.core.BtDevices
 import com.autotasker.core.DeviceState
+import com.autotasker.data.Store
+import com.autotasker.work.WatchManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("BatteryLife")
@@ -39,6 +41,8 @@ fun SetupScreen(onBack: () -> Unit) {
         ActivityResultContracts.StartActivityForResult()
     ) { refresh++ }
 
+    val cfg by Store.config.collectAsState()
+    val watchNeeded = remember(refresh, cfg) { WatchManager.isNeeded(context) }
     val overlay = remember(refresh) { DeviceState.canDrawOverlays(context) }
     val batteryFree = remember(refresh) { DeviceState.isIgnoringBatteryOptimizations(context) }
     val btOk = remember(refresh) { BtDevices.hasPermission(context) }
@@ -130,6 +134,50 @@ fun SetupScreen(onBack: () -> Unit) {
             }
 
             SectionCard(
+                title = "Surveillance du chargeur",
+                subtitle = if (watchNeeded) "Active" else "Inutile avec vos règles actuelles"
+            ) {
+                Text(
+                    "Android n'autorise pas une application à être réveillée par le branchement " +
+                        "du chargeur via une simple déclaration : ces diffusions ne font pas partie " +
+                        "des exceptions du manifeste depuis Android 8. Le seul moyen de les recevoir " +
+                        "est de garder un service à l'écoute, d'où la notification permanente.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                SwitchRow(
+                    "Autoriser la surveillance du chargeur",
+                    cfg.powerWatchEnabled,
+                    "Le service ne démarre que si une règle utilise un déclencheur lié à la charge. " +
+                        "Les déclencheurs Bluetooth fonctionnent sans lui."
+                ) { value ->
+                    Store.update { it.copy(powerWatchEnabled = value) }
+                    WatchManager.sync(context)
+                    refresh++
+                }
+                Text(
+                    "La notification peut être masquée sans désactiver la surveillance : appui long " +
+                        "dessus → catégorie « Surveillance du chargeur » → désactiver.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            SectionCard(
+                title = "Journal",
+                subtitle = "Diagnostic"
+            ) {
+                SwitchRow(
+                    "Journal détaillé",
+                    cfg.verboseLog,
+                    "Consigne aussi les réveils sans effet. Indispensable pour comprendre pourquoi " +
+                        "une règle ne part pas, bruyant une fois tout réglé."
+                ) { value ->
+                    Store.update { it.copy(verboseLog = value) }
+                    refresh++
+                }
+            }
+
+            SectionCard(
                 title = "Démarrage automatique (constructeurs)",
                 subtitle = "Xiaomi, Huawei, Oppo, OnePlus, Samsung…"
             ) {
@@ -155,9 +203,9 @@ fun SetupScreen(onBack: () -> Unit) {
                 subtitle = "Ce que fait réellement l'appli quand vous ne l'utilisez pas"
             ) {
                 Text(
-                    "• Aucun service résident, aucun timer, aucune boucle de sondage.\n" +
-                        "• Le processus n'est réveillé que par les diffusions d'Android : " +
-                        "branchement/débranchement du chargeur et connexion/déconnexion Bluetooth.\n" +
+                    "• Aucun timer, aucune boucle de sondage.\n" +
+                        "• Le processus est réveillé par les diffusions Bluetooth d'Android, " +
+                        "et par le service de surveillance pour le chargeur.\n" +
                         "• Chaque réveil dure quelques millisecondes (lecture de l'état, comparaison, " +
                         "puis extinction).\n" +
                         "• Le seul travail récurrent est la règle « périodique », si vous l'activez : " +
