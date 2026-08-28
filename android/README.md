@@ -58,24 +58,42 @@ au moment où cette combinaison devient vraie, quel que soit l'ordre des deux é
 
 ## Installation
 
-### Option A — récupérer l'APK construit par la CI
+### Lien direct, toujours le même
 
-Le workflow `.github/workflows/android.yml` construit l'APK à chaque push touchant
-`android/`. Onglet **Actions** → dernier run → artefact `autotasker-apk`.
-Installer le `.apk` (autoriser les sources inconnues).
+```
+https://github.com/Oobilsteinoo/vscode-fanuc-karel/releases/download/autotasker-latest/autotasker.apk
+```
 
-### Option B — construire soi-même
+À ouvrir depuis le navigateur du téléphone : pas de compte GitHub, pas de zip. Cette URL
+pointe toujours vers le dernier build réussi — mettez-la en favori.
+
+### Mise à jour sans désinstaller
+
+L'APK est signé avec la clé versionnée dans `keystore/`, et la CI incrémente le `versionCode`
+à chaque build (numéro de run). Une nouvelle version s'installe donc **par-dessus**
+l'ancienne, en conservant vos règles et vos appareils Bluetooth.
+
+> **Signature.** Cette clé est publique et ce n'est pas un oubli. Sans clé stable, chaque
+> build de la CI serait signé par une clé de debug régénérée à neuf, et Android refuserait
+> toute installation par-dessus la précédente — il faudrait désinstaller à chaque fois.
+> Ce n'est pas un identifiant : elle ne donne accès à aucun compte ni service. Son seul
+> pouvoir est de signer un APK qu'Android accepterait comme mise à jour de `com.autotasker`,
+> ce qui suppose déjà de vous faire installer un fichier à la main. Pour une appli
+> personnelle distribuée hors Play Store, le compromis est délibéré. Pour la rendre privée :
+> déplacer le `.jks` en secret GitHub (`base64 -w0`) et le décoder dans le workflow.
+
+### Construire soi-même
 
 ```bash
 cd android
-./gradlew assembleDebug
-# → app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease
+# → app/build/outputs/apk/release/app-release.apk
 ```
 
 Nécessite un JDK 17 et le SDK Android (API 35). Android Studio fait tout ça tout seul :
-ouvrir le dossier `android/`.
-
----
+ouvrir le dossier `android/`. Attention, un build local produit `versionCode = 1` : pour
+réinstaller par-dessus une version issue de la CI, passez `AUTOTASKER_VERSION_CODE` à une
+valeur supérieure.
 
 ## Configuration
 

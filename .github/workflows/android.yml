@@ -11,6 +11,13 @@ on:
       - "android/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+env:
+  # Tag fixe : l'URL de téléchargement ne change jamais d'une version à l'autre.
+  RELEASE_TAG: autotasker-latest
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,19 +33,48 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        env:
+          # Le numéro de run garantit un versionCode croissant : Android accepte
+          # l'installation par-dessus la version précédente sans désinstaller.
+          AUTOTASKER_VERSION_CODE: ${{ github.run_number }}
+          AUTOTASKER_VERSION_NAME: 1.${{ github.run_number }}
+        run: |
+          ./gradlew --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/autotasker.apk"
 
-      - name: Build release APK (signée avec la clé de debug)
-        working-directory: android
-        run: ./gradlew --no-daemon assembleRelease
-
-      - name: Upload APKs
+      - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: autotasker-apk
-          path: |
-            android/app/build/outputs/apk/debug/*.apk
-            android/app/build/outputs/apk/release/*.apk
+          path: autotasker.apk
           if-no-files-found: error
+
+      - name: Publish to the fixed-tag release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # La release est recréée à chaque fois pour que le tag suive le dernier commit,
+          # tout en gardant une URL de téléchargement identique.
+          gh release delete "$RELEASE_TAG" --cleanup-tag --yes || true
+          URL="https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG/autotasker.apk"
+          {
+            printf 'Build automatique du commit `%s` (version 1.%s).\n\n' "${GITHUB_SHA:0:7}" "${{ github.run_number }}"
+            printf '**Téléchargement direct :** %s\n\n' "$URL"
+            printf "Cette URL ne change jamais. L'APK est signé avec une clé stable : il s'installe par-dessus la version précédente sans désinstallation.\n"
+          } > notes.md
+          gh release create "$RELEASE_TAG" autotasker.apk \
+            --title "AutoTasker — dernière version" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes-file notes.md
+
+      - name: Summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "### APK prêt" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG/autotasker.apk" >> "$GITHUB_STEP_SUMMARY"

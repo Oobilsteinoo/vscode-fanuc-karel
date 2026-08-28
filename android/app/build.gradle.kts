@@ -13,13 +13,27 @@ android {
         applicationId = "com.autotasker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Incrémenté par la CI (numéro de run) pour que chaque build soit une vraie mise à jour.
+        versionCode = (System.getenv("AUTOTASKER_VERSION_CODE") ?: "1").toInt()
+        versionName = System.getenv("AUTOTASKER_VERSION_NAME") ?: "1.0"
+    }
+
+    signingConfigs {
+        // Clé stable et volontairement publique : sans elle, chaque build de la CI serait signé
+        // par une clé de debug différente et Android refuserait l'installation par-dessus la
+        // version précédente. Voir la note « Signature » du README.
+        create("shared") {
+            storeFile = rootProject.file("keystore/autotasker-signing.jks")
+            storePassword = "autotasker"
+            keyAlias = "autotasker"
+            keyPassword = "autotasker"
+        }
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
         }
         release {
             // Pas de minification : l'appli est minuscule et distribuée hors Play Store.
@@ -29,8 +43,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Signé avec la clé de debug pour permettre un `assembleRelease` sans keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("shared")
         }
     }
 
