@@ -1,18 +1,11 @@
 package com.autotasker.core
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import com.autotasker.data.EventLog
-import kotlinx.coroutines.delay
-import org.lsposed.hiddenapibypass.HiddenApiBypass
-import rikka.shizuku.Shizuku
-import rikka.shizuku.ShizukuBinderWrapper
-import rikka.shizuku.SystemServiceHelper
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -20,17 +13,13 @@ import java.util.concurrent.TimeUnit
 /**
  * Activation et désactivation du partage de connexion via Shizuku.
  *
- * Aucune API publique ne permet de basculer le partage de connexion :
- * `TetheringManager.startTethering()` exige `TETHER_PRIVILEGED`, de niveau
- * `signature|privileged`. Shizuku contourne la restriction en exécutant l'appel sous l'identité
- * du shell (uid 2000), qui détient cette permission — c'est le même service système que celui
- * que pilote le bouton des réglages.
+ * Aucune API publique ne le permet : `TetheringManager.startTethering()` exige
+ * `TETHER_PRIVILEGED`, de niveau `signature|privileged`. [ShizukuBridge] contourne la
+ * restriction en exécutant l'appel sous l'identité du shell (uid 2000), qui détient cette
+ * permission — c'est le même service système que celui que pilote le bouton des réglages.
  *
- * Conséquences directes :
- *  - Shizuku doit être installé **et lancé**. Sans root, il doit être relancé après chaque
- *    redémarrage, sauf si son option « démarrage au boot » (débogage sans fil) est active.
- *  - Les vérifications d'éligibilité opérateur continuent de s'appliquer, exactement comme
- *    lorsqu'on appuie sur le bouton.
+ * Les vérifications d'éligibilité opérateur continuent de s'appliquer, exactement comme
+ * lorsqu'on appuie sur le bouton soi-même.
  *
  * Tout passe par la réflexion : `ITetheringConnector` est une interface interne dont la
  * signature varie d'une version d'Android à l'autre. La méthode est donc retrouvée par son nom,
@@ -52,9 +41,6 @@ object Tethering {
 
     private const val LISTENER_INTERFACE = "android.net.IIntResultListener"
 
-    @Volatile
-    private var exemptionsRequested = false
-
     enum class Result {
         OK,
         SHIZUKU_ABSENT,
@@ -64,48 +50,22 @@ object Tethering {
         val message: String
             get() = when (this) {
                 OK -> "Partage de connexion basculé"
-                SHIZUKU_ABSENT -> "Shizuku n'est pas lancé — le partage de connexion ne peut pas être basculé"
-                SHIZUKU_NON_AUTORISE -> "Shizuku n'a pas autorisé AutoTasker — à accorder dans Réglages"
-                ECHEC -> "Le système a refusé le basculement du partage de connexion"
+                SHIZUKU_ABSENT -> "Shizuku n'est pas lancé"
+                SHIZUKU_NON_AUTORISE -> "Shizuku n'a pas autorisé AutoTasker"
+                ECHEC -> "le système a refusé le basculement"
             }
     }
 
-    // ---- état de Shizuku ----
-
-    fun shizukuRunning(): Boolean = try {
-        Shizuku.pingBinder()
-    } catch (t: Throwable) {
-        false
-    }
-
-    fun shizukuGranted(): Boolean = try {
-        shizukuRunning() &&
-            !Shizuku.isPreV11() &&
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-    } catch (t: Throwable) {
-        false
-    }
-
-    fun requestPermission() {
-        runCatching { Shizuku.requestPermission(SHIZUKU_REQUEST_CODE) }
-    }
-
-    const val SHIZUKU_REQUEST_CODE = 4242
-
-    // ---- action ----
-
-    /**
-     * Bascule le partage de connexion Wi-Fi.
-     *
-     * Le processus est souvent démarré par une diffusion : Shizuku peut n'avoir pas encore
-     * transmis son binder au moment de l'appel, d'où la courte attente initiale.
-     */
+    /** Bascule le partage de connexion Wi-Fi. */
     suspend fun setEnabled(context: Context, enable: Boolean): Result {
-        if (!awaitShizuku()) return Result.SHIZUKU_ABSENT
-        if (!shizukuGranted()) return Result.SHIZUKU_NON_AUTORISE
+        when (ShizukuBridge.awaitReady()) {
+            ShizukuBridge.State.ABSENT -> return Result.SHIZUKU_ABSENT
+            ShizukuBridge.State.NON_AUTORISE -> return Result.SHIZUKU_NON_AUTORISE
+            ShizukuBridge.State.PRET -> Unit
+        }
 
         return try {
-            ensureHiddenApiAccess()
+            ShizukuBridge.ensureHiddenApiAccess()
             val code = if (enable) start() else stop()
             // 0 = succès ; null = requête transmise sans accusé de réception dans le délai imparti.
             if (code == null || code == 0) {
@@ -122,7 +82,7 @@ object Tethering {
 
     /** `true`/`false` si l'état est lisible, `null` sinon. */
     fun isEnabled(context: Context): Boolean? = try {
-        ensureHiddenApiAccess()
+        ShizukuBridge.ensureHiddenApiAccess()
         val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val state = WifiManager::class.java.getMethod("getWifiApState").invoke(wifi) as Int
         state == WIFI_AP_STATE_ENABLED
@@ -132,33 +92,10 @@ object Tethering {
 
     // ---- interne ----
 
-    private suspend fun awaitShizuku(timeoutMs: Long = 3000L): Boolean {
-        if (shizukuRunning()) return true
-        var waited = 0L
-        while (waited < timeoutMs) {
-            delay(250)
-            waited += 250
-            if (shizukuRunning()) return true
-        }
-        return false
-    }
-
-    private fun ensureHiddenApiAccess() {
-        if (exemptionsRequested) return
-        exemptionsRequested = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
-        }
-    }
-
-    private fun connector(): Any {
-        val raw = SystemServiceHelper.getSystemService("tethering")
-            ?: error("service système « tethering » introuvable")
-        val stub = Class.forName("android.net.ITetheringConnector\$Stub")
-        val asInterface = stub.getMethod("asInterface", IBinder::class.java)
-        return asInterface.invoke(null, ShizukuBinderWrapper(raw))
-            ?: error("ITetheringConnector.asInterface a renvoyé null")
-    }
+    private fun connector(): Any = ShizukuBridge.asInterface(
+        "android.net.ITetheringConnector\$Stub",
+        ShizukuBridge.systemService("tethering")
+    )
 
     private fun stop(): Int? =
         callConnector("stopTethering", TETHERING_WIFI) { it == Int::class.javaPrimitiveType }

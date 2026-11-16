@@ -174,7 +174,7 @@ Autres déclencheurs disponibles pour ce cas : *Wi-Fi perdu* (sortie de la maiso
 |---|---|
 | `Lancer une application` | Ouvre l'appli et la laisse au premier plan |
 | `Réveiller une application` | Ouvre l'appli, attend N secondes, revient à l'accueil |
-| `Fermer une application` | Demande la fin de ses processus d'arrière-plan — **voir la limite ci-dessous** |
+| `Fermer une application` | La ferme réellement — **nécessite Shizuku**, sinon repli partiel |
 | `Attendre` | Pause entre deux actions |
 | `Retour à l'accueil` | Envoie l'intent HOME : met l'appli au premier plan en arrière-plan |
 | `Ouvrir un lien` | URL ou lien d'appli (`https://`, `dscam://`…) |
@@ -184,7 +184,7 @@ Autres déclencheurs disponibles pour ce cas : *Wi-Fi perdu* (sortie de la maiso
 | `Désactiver le partage de connexion` | Le coupe — **nécessite Shizuku** |
 | `Ouvrir le partage de connexion` | Amène simplement à l'écran système, sans dépendance |
 
-### Partage de connexion : pourquoi Shizuku
+### Shizuku : partage de connexion et fermeture d'applications
 
 Aucune API publique ne bascule le partage de connexion.
 `TetheringManager.startTethering()` n'est public que depuis l'API 36 (Android 16) et exige
@@ -202,6 +202,11 @@ bouton des réglages. Tout passe par la réflexion, la signature de cette interf
 variant selon les versions d'Android : la méthode est retrouvée par son nom, son nombre de
 paramètres et le type du premier.
 
+Le même mécanisme sert à fermer une application : `IActivityManager.forceStopPackage` sous
+l'identité du shell, soit l'équivalent exact de `adb shell am force-stop`. `FORCE_STOP_PACKAGES`
+est elle aussi `signature|privileged`, et `killBackgroundProcesses` n'agit plus que sur l'appli
+appelante depuis Android 14.
+
 Mise en place : installer Shizuku, le lancer, puis autoriser AutoTasker depuis l'écran
 **Réglages** de l'appli.
 
@@ -218,13 +223,12 @@ L'action `Ouvrir le partage de connexion` reste disponible pour qui ne veut pas 
 elle essaie l'activité AOSP, puis l'action non documentée que déclarent la plupart des
 surcouches, et retombe sur les réglages sans fil garantis par le SDK.
 
-> **Fermer une application, honnêtement.** Android n'expose aucune API publique permettant de
-> terminer une application tierce. `Fermer une application` appelle `killBackgroundProcesses`,
-> qui fonctionne jusqu'à Android 13 mais que **Android 14 a restreint à l'appli appelante** :
-> sur les versions récentes l'appel est silencieusement ignoré (le journal le signale).
-> Pour obtenir l'effet recherché en sortant de voiture, utilisez plutôt `Pause média` — qui
-> coupe réellement la lecture — et `Retour à l'accueil`, qui bascule l'appli au premier plan
-> en arrière-plan où Android la recyclera de lui-même.
+> **Fermer une application.** Avec Shizuku, `IActivityManager.forceStopPackage` est appelé
+> sous l'identité du shell : c'est exactement `adb shell am force-stop`, et l'appli est
+> réellement terminée. Sans Shizuku, repli sur `killBackgroundProcesses`, qu'Android 14 a
+> restreint à l'appli appelante — l'appel devient alors sans effet sur les applis tierces, et le
+> journal le signale. Dans ce cas, `Pause média` et `Retour à l'accueil` restent les seuls
+> leviers réels.
 
 ## Déclencheurs et conditions
 
@@ -259,9 +263,6 @@ aucune action) — c'est le premier endroit à regarder quand « ça n'a pas mar
 - **Perte de Wi-Fi détectée avec retard.** Android ne diffuse plus le changement d'état
   réseau aux receivers déclarés dans le manifeste. La transition est donc constatée au
   prochain événement (charge, Bluetooth) ou au prochain réveil périodique.
-- **Fermer une application est impossible sur Android 14+.** Détaillé plus haut : aucune API
-  publique ne le permet sans service d'accessibilité, lequel serait résident en mémoire et
-  irait à l'encontre de l'objectif de consommation minimale.
 - **La charge impose un service résident.** Détaillé plus haut. Si vous n'utilisez que des
   déclencheurs Bluetooth, aucun service ne tourne et l'appli est réellement invisible.
 - **Lancement en arrière-plan.** Si l'autorisation d'affichage par-dessus les autres

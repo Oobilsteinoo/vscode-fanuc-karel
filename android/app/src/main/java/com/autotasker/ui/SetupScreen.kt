@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.autotasker.core.BtDevices
 import com.autotasker.core.DeviceState
-import com.autotasker.core.Tethering
+import com.autotasker.core.ShizukuBridge
 import com.autotasker.data.Store
 import com.autotasker.work.WatchManager
 
@@ -44,8 +44,8 @@ fun SetupScreen(onBack: () -> Unit) {
 
     val cfg by Store.config.collectAsState()
     val watchNeeded = remember(refresh, cfg) { WatchManager.isNeeded(context) }
-    val shizukuRunning = remember(refresh) { Tethering.shizukuRunning() }
-    val shizukuGranted = remember(refresh) { Tethering.shizukuGranted() }
+    val shizukuRunning = remember(refresh) { ShizukuBridge.running() }
+    val shizukuGranted = remember(refresh) { ShizukuBridge.granted() }
     val overlay = remember(refresh) { DeviceState.canDrawOverlays(context) }
     val batteryFree = remember(refresh) { DeviceState.isIgnoringBatteryOptimizations(context) }
     val btOk = remember(refresh) { BtDevices.hasPermission(context) }
@@ -137,7 +137,7 @@ fun SetupScreen(onBack: () -> Unit) {
             }
 
             SectionCard(
-                title = "Partage de connexion (Shizuku)",
+                title = "Shizuku — partage de connexion et fermeture d'applis",
                 subtitle = when {
                     shizukuGranted -> "Prêt"
                     shizukuRunning -> "Shizuku lancé, autorisation manquante"
@@ -154,10 +154,11 @@ fun SetupScreen(onBack: () -> Unit) {
                     shizukuGranted
                 )
                 Text(
-                    "Aucune API publique ne permet de basculer le partage de connexion : elle " +
-                        "exige une permission réservée au système. Shizuku permet d'exécuter " +
-                        "l'appel sous l'identité du shell, qui la détient — c'est le même service " +
-                        "que celui piloté par le bouton des réglages.",
+                    "Deux actions exigent des permissions réservées au système : basculer le " +
+                        "partage de connexion et fermer réellement une application. Shizuku " +
+                        "exécute ces appels sous l'identité du shell, qui les détient — ce sont " +
+                        "les mêmes services que ceux pilotés par le bouton des réglages et par " +
+                        "« adb shell am force-stop ».",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (!shizukuRunning) {
@@ -175,7 +176,7 @@ fun SetupScreen(onBack: () -> Unit) {
                     }) { Text("Installer Shizuku") }
                 } else if (!shizukuGranted) {
                     Button(onClick = {
-                        Tethering.requestPermission()
+                        ShizukuBridge.requestPermission()
                         refresh++
                     }) { Text("Autoriser AutoTasker dans Shizuku") }
                 }

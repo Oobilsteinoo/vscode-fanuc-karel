@@ -1,13 +1,12 @@
 package com.autotasker.engine
 
-import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import android.view.KeyEvent
+import com.autotasker.core.AppControl
 import com.autotasker.core.Apps
 import com.autotasker.core.Tethering
 import com.autotasker.data.Action
@@ -81,23 +80,16 @@ object ActionRunner {
     }
 
     /**
-     * Demande à Android de tuer les processus d'arrière-plan d'une application.
-     *
-     * Attention : depuis Android 14, `killBackgroundProcesses` n'agit plus que sur l'appli
-     * appelante — l'appel devient silencieusement sans effet sur les autres. Il n'existe aucune
-     * API publique pour fermer une application tierce sans service d'accessibilité. Sur ces
-     * versions, préférez « Retour à l'accueil » (qui met l'appli en arrière-plan) et
-     * « Pause média » (qui coupe réellement la lecture).
+     * Ferme réellement une application via Shizuku (`IActivityManager.forceStopPackage`,
+     * l'équivalent de `adb shell am force-stop`). Sans Shizuku, repli sur
+     * `killBackgroundProcesses`, qu'Android 14+ ignore pour les applis tierces.
      */
-    private fun closeApp(context: Context, packageName: String) {
+    private suspend fun closeApp(context: Context, packageName: String) {
         if (packageName.isBlank()) return
-        val am = context.getSystemService(ActivityManager::class.java) ?: return
-        am.killBackgroundProcesses(packageName)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            EventLog.add(
-                "ℹ Fermeture de ${Apps.labelFor(context, packageName)} demandée, " +
-                    "mais Android 14+ l'ignore pour les applis tierces"
-            )
+        val label = Apps.labelFor(context, packageName)
+        when (val result = AppControl.forceStop(context, packageName)) {
+            AppControl.Result.OK -> EventLog.add("$label fermée")
+            else -> EventLog.add("⚠ Fermeture de $label — ${result.message}")
         }
     }
 
