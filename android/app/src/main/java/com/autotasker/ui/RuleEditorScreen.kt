@@ -378,6 +378,9 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
                     ActionType.MEDIA_PAUSE -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.MEDIA_PAUSE))
                     }
+                    ActionType.OPEN_TETHER_SETTINGS -> mutate {
+                        it.copy(actions = it.actions + Action(type = ActionType.OPEN_TETHER_SETTINGS))
+                    }
                     ActionType.OPEN_URL -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.OPEN_URL, url = "https://"))
                     }

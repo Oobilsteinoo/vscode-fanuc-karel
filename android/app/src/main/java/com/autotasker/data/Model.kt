@@ -121,7 +121,17 @@ enum class ActionType {
     MEDIA_PLAY,
 
     /** Envoie la touche média « Pause » (coupe la musique en sortant de voiture). */
-    MEDIA_PAUSE;
+    MEDIA_PAUSE,
+
+    /**
+     * Ouvre l'écran système du partage de connexion.
+     *
+     * Ce n'est volontairement **pas** un interrupteur : activer le partage de connexion par
+     * programme exige `TETHER_PRIVILEGED`, une permission `signature|privileged` hors de portée
+     * d'une appli installée manuellement. L'action amène au bon écran, le basculement reste
+     * un geste manuel.
+     */
+    OPEN_TETHER_SETTINGS;
 
     val label: String
         get() = when (this) {
@@ -133,6 +143,7 @@ enum class ActionType {
             OPEN_URL -> "Ouvrir un lien"
             MEDIA_PLAY -> "Lecture média"
             MEDIA_PAUSE -> "Pause média"
+            OPEN_TETHER_SETTINGS -> "Ouvrir le partage de connexion"
         }
 
     /** L'action porte sur une application à choisir. */
@@ -158,6 +169,7 @@ data class Action(
         ActionType.OPEN_URL -> "Ouvrir $url"
         ActionType.MEDIA_PLAY -> "Lecture média"
         ActionType.MEDIA_PAUSE -> "Pause média"
+        ActionType.OPEN_TETHER_SETTINGS -> "Ouvrir les réglages du partage de connexion"
     }
 }
 

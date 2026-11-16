@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.view.KeyEvent
 import com.autotasker.core.Apps
 import com.autotasker.data.Action
@@ -58,6 +59,8 @@ object ActionRunner {
             ActionType.MEDIA_PLAY -> mediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY)
 
             ActionType.MEDIA_PAUSE -> mediaKey(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
+
+            ActionType.OPEN_TETHER_SETTINGS -> openTetherSettings(context)
         }
     }
 
@@ -98,6 +101,34 @@ object ActionRunner {
             .addCategory(Intent.CATEGORY_HOME)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
+    }
+
+    /**
+     * Ouvre l'écran du partage de connexion.
+     *
+     * Il n'existe pas de constante publique pour cet écran : on tente l'activité d'AOSP, puis
+     * l'action non documentée que la plupart des surcouches déclarent, et enfin les réglages
+     * sans fil, qui sont eux garantis par le SDK. Le premier candidat qui démarre gagne.
+     */
+    private fun openTetherSettings(context: Context) {
+        val candidates = listOf(
+            "activité AOSP" to Intent().setClassName(
+                "com.android.settings",
+                "com.android.settings.TetherSettings"
+            ),
+            "action TETHER_SETTINGS" to Intent("android.settings.TETHER_SETTINGS"),
+            "réglages sans fil" to Intent(Settings.ACTION_WIRELESS_SETTINGS)
+        )
+        for ((name, intent) in candidates) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                context.startActivity(intent)
+                return
+            } catch (t: Throwable) {
+                EventLog.add("Partage de connexion : $name indisponible, candidat suivant")
+            }
+        }
+        EventLog.add("⚠ Aucun écran de partage de connexion trouvé sur cet appareil")
     }
 
     private fun mediaKey(context: Context, keyCode: Int) {

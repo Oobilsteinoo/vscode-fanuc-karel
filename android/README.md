@@ -180,6 +180,18 @@ Autres déclencheurs disponibles pour ce cas : *Wi-Fi perdu* (sortie de la maiso
 | `Ouvrir un lien` | URL ou lien d'appli (`https://`, `dscam://`…) |
 | `Lecture média` | Touche « Play » (reprend Spotify, etc.) |
 | `Pause média` | Touche « Pause » (coupe la musique en sortant de voiture) |
+| `Ouvrir le partage de connexion` | Amène à l'écran système — **n'active rien**, voir ci-dessous |
+
+> **Le partage de connexion ne peut pas être basculé.** `TetheringManager.startTethering()`
+> n'est public que depuis l'API 36 (Android 16), et exige `TETHER_PRIVILEGED` — une permission
+> `signature|privileged` réservée aux applications système, propriétaires d'appareil et
+> opérateurs. Elle n'est pas accordable à un APK installé manuellement, pas même par
+> `pm grant`, qui ne couvre que les permissions de niveau *development*. Il n'existe par
+> ailleurs aucune constante publique `ACTION_TETHER_SETTINGS`, et
+> `WifiManager.startLocalOnlyHotspot()` crée un point d'accès **sans partage de la connexion
+> internet**. L'action se contente donc d'ouvrir le bon écran : elle essaie l'activité AOSP,
+> puis l'action non documentée que déclarent la plupart des surcouches, et retombe sur les
+> réglages sans fil garantis par le SDK.
 
 > **Fermer une application, honnêtement.** Android n'expose aucune API publique permettant de
 > terminer une application tierce. `Fermer une application` appelle `killBackgroundProcesses`,
