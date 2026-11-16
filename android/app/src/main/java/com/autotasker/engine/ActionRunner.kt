@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import android.view.KeyEvent
 import com.autotasker.core.Apps
+import com.autotasker.core.Tethering
 import com.autotasker.data.Action
 import com.autotasker.data.ActionType
 import com.autotasker.data.EventLog
@@ -61,6 +62,10 @@ object ActionRunner {
             ActionType.MEDIA_PAUSE -> mediaKey(context, KeyEvent.KEYCODE_MEDIA_PAUSE)
 
             ActionType.OPEN_TETHER_SETTINGS -> openTetherSettings(context)
+
+            ActionType.TETHERING_ON -> setTethering(context, true)
+
+            ActionType.TETHERING_OFF -> setTethering(context, false)
         }
     }
 
@@ -101,6 +106,14 @@ object ActionRunner {
             .addCategory(Intent.CATEGORY_HOME)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
+    }
+
+    private suspend fun setTethering(context: Context, enable: Boolean) {
+        val verb = if (enable) "Activation" else "Désactivation"
+        when (val result = Tethering.setEnabled(context, enable)) {
+            Tethering.Result.OK -> EventLog.add("$verb du partage de connexion : OK")
+            else -> EventLog.add("⚠ $verb du partage de connexion — ${result.message}")
+        }
     }
 
     /**

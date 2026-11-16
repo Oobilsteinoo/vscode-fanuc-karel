@@ -131,7 +131,13 @@ enum class ActionType {
      * d'une appli installée manuellement. L'action amène au bon écran, le basculement reste
      * un geste manuel.
      */
-    OPEN_TETHER_SETTINGS;
+    OPEN_TETHER_SETTINGS,
+
+    /** Active le partage de connexion Wi-Fi (nécessite Shizuku). */
+    TETHERING_ON,
+
+    /** Désactive le partage de connexion Wi-Fi (nécessite Shizuku). */
+    TETHERING_OFF;
 
     val label: String
         get() = when (this) {
@@ -144,6 +150,8 @@ enum class ActionType {
             MEDIA_PLAY -> "Lecture média"
             MEDIA_PAUSE -> "Pause média"
             OPEN_TETHER_SETTINGS -> "Ouvrir le partage de connexion"
+            TETHERING_ON -> "Activer le partage de connexion"
+            TETHERING_OFF -> "Désactiver le partage de connexion"
         }
 
     /** L'action porte sur une application à choisir. */
@@ -170,6 +178,8 @@ data class Action(
         ActionType.MEDIA_PLAY -> "Lecture média"
         ActionType.MEDIA_PAUSE -> "Pause média"
         ActionType.OPEN_TETHER_SETTINGS -> "Ouvrir les réglages du partage de connexion"
+        ActionType.TETHERING_ON -> "Activer le partage de connexion"
+        ActionType.TETHERING_OFF -> "Désactiver le partage de connexion"
     }
 }
 

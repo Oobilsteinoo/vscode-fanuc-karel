@@ -85,4 +85,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Partage de connexion : exécute l'appel système sous l'identité du shell.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
+    // Lève les restrictions d'accès aux API non-SDK (Android 9+) pour la réflexion ci-dessus.
+    implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
 }

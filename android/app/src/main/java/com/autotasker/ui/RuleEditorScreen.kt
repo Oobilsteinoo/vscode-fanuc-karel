@@ -381,6 +381,12 @@ fun RuleEditorScreen(ruleId: String?, onBack: () -> Unit) {
                     ActionType.OPEN_TETHER_SETTINGS -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.OPEN_TETHER_SETTINGS))
                     }
+                    ActionType.TETHERING_ON -> mutate {
+                        it.copy(actions = it.actions + Action(type = ActionType.TETHERING_ON))
+                    }
+                    ActionType.TETHERING_OFF -> mutate {
+                        it.copy(actions = it.actions + Action(type = ActionType.TETHERING_OFF))
+                    }
                     ActionType.OPEN_URL -> mutate {
                         it.copy(actions = it.actions + Action(type = ActionType.OPEN_URL, url = "https://"))
                     }

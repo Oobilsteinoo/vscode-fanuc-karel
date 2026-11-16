@@ -180,18 +180,43 @@ Autres déclencheurs disponibles pour ce cas : *Wi-Fi perdu* (sortie de la maiso
 | `Ouvrir un lien` | URL ou lien d'appli (`https://`, `dscam://`…) |
 | `Lecture média` | Touche « Play » (reprend Spotify, etc.) |
 | `Pause média` | Touche « Pause » (coupe la musique en sortant de voiture) |
-| `Ouvrir le partage de connexion` | Amène à l'écran système — **n'active rien**, voir ci-dessous |
+| `Activer le partage de connexion` | Active le partage de connexion Wi-Fi — **nécessite Shizuku** |
+| `Désactiver le partage de connexion` | Le coupe — **nécessite Shizuku** |
+| `Ouvrir le partage de connexion` | Amène simplement à l'écran système, sans dépendance |
 
-> **Le partage de connexion ne peut pas être basculé.** `TetheringManager.startTethering()`
-> n'est public que depuis l'API 36 (Android 16), et exige `TETHER_PRIVILEGED` — une permission
-> `signature|privileged` réservée aux applications système, propriétaires d'appareil et
-> opérateurs. Elle n'est pas accordable à un APK installé manuellement, pas même par
-> `pm grant`, qui ne couvre que les permissions de niveau *development*. Il n'existe par
-> ailleurs aucune constante publique `ACTION_TETHER_SETTINGS`, et
-> `WifiManager.startLocalOnlyHotspot()` crée un point d'accès **sans partage de la connexion
-> internet**. L'action se contente donc d'ouvrir le bon écran : elle essaie l'activité AOSP,
-> puis l'action non documentée que déclarent la plupart des surcouches, et retombe sur les
-> réglages sans fil garantis par le SDK.
+### Partage de connexion : pourquoi Shizuku
+
+Aucune API publique ne bascule le partage de connexion.
+`TetheringManager.startTethering()` n'est public que depuis l'API 36 (Android 16) et exige
+`TETHER_PRIVILEGED`, permission `signature|privileged` réservée aux applications système,
+propriétaires d'appareil et opérateurs — non accordable à un APK installé manuellement, pas
+même par `pm grant`, qui ne couvre que les permissions de niveau *development*. Il n'existe
+par ailleurs aucune constante publique `ACTION_TETHER_SETTINGS`, et
+`WifiManager.startLocalOnlyHotspot()` crée un point d'accès **sans partage de la connexion
+internet**.
+
+[Shizuku](https://shizuku.rikka.app/) lève le blocage en exécutant l'appel sous l'identité du
+shell (uid 2000), qui détient `TETHER_PRIVILEGED`. L'appli invoque alors
+`ITetheringConnector.startTethering` / `stopTethering` — le service système que pilote le
+bouton des réglages. Tout passe par la réflexion, la signature de cette interface interne
+variant selon les versions d'Android : la méthode est retrouvée par son nom, son nombre de
+paramètres et le type du premier.
+
+Mise en place : installer Shizuku, le lancer, puis autoriser AutoTasker depuis l'écran
+**Réglages** de l'appli.
+
+Deux limites à connaître :
+
+- **Sans root, Shizuku doit être relancé après chaque redémarrage.** Son option de démarrage
+  automatique par débogage sans fil l'évite, mais exige une connexion Wi-Fi et met quelques
+  minutes à s'activer après le boot. Entre deux redémarrages, le basculement est entièrement
+  automatique.
+- **Les vérifications d'éligibilité opérateur s'appliquent toujours**, exactement comme en
+  appuyant sur le bouton soi-même.
+
+L'action `Ouvrir le partage de connexion` reste disponible pour qui ne veut pas de Shizuku :
+elle essaie l'activité AOSP, puis l'action non documentée que déclarent la plupart des
+surcouches, et retombe sur les réglages sans fil garantis par le SDK.
 
 > **Fermer une application, honnêtement.** Android n'expose aucune API publique permettant de
 > terminer une application tierce. `Fermer une application` appelle `killBackgroundProcesses`,

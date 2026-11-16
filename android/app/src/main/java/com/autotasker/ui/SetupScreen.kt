@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.autotasker.core.BtDevices
 import com.autotasker.core.DeviceState
+import com.autotasker.core.Tethering
 import com.autotasker.data.Store
 import com.autotasker.work.WatchManager
 
@@ -43,6 +44,8 @@ fun SetupScreen(onBack: () -> Unit) {
 
     val cfg by Store.config.collectAsState()
     val watchNeeded = remember(refresh, cfg) { WatchManager.isNeeded(context) }
+    val shizukuRunning = remember(refresh) { Tethering.shizukuRunning() }
+    val shizukuGranted = remember(refresh) { Tethering.shizukuGranted() }
     val overlay = remember(refresh) { DeviceState.canDrawOverlays(context) }
     val batteryFree = remember(refresh) { DeviceState.isIgnoringBatteryOptimizations(context) }
     val btOk = remember(refresh) { BtDevices.hasPermission(context) }
@@ -131,6 +134,57 @@ fun SetupScreen(onBack: () -> Unit) {
                 if (Build.VERSION.SDK_INT >= 33) {
                     notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+            }
+
+            SectionCard(
+                title = "Partage de connexion (Shizuku)",
+                subtitle = when {
+                    shizukuGranted -> "Prêt"
+                    shizukuRunning -> "Shizuku lancé, autorisation manquante"
+                    else -> "Shizuku n'est pas lancé"
+                }
+            ) {
+                StatusRow(
+                    "Shizuku",
+                    when {
+                        shizukuGranted -> "autorisé"
+                        shizukuRunning -> "lancé, non autorisé"
+                        else -> "non lancé"
+                    },
+                    shizukuGranted
+                )
+                Text(
+                    "Aucune API publique ne permet de basculer le partage de connexion : elle " +
+                        "exige une permission réservée au système. Shizuku permet d'exécuter " +
+                        "l'appel sous l'identité du shell, qui la détient — c'est le même service " +
+                        "que celui piloté par le bouton des réglages.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (!shizukuRunning) {
+                    Text(
+                        "Installez Shizuku puis lancez-le. Sans root, il doit être relancé après " +
+                            "chaque redémarrage, sauf si vous activez son démarrage automatique " +
+                            "par débogage sans fil.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(onClick = {
+                        settingsLauncher.launch(
+                            Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/"))
+                        )
+                    }) { Text("Installer Shizuku") }
+                } else if (!shizukuGranted) {
+                    Button(onClick = {
+                        Tethering.requestPermission()
+                        refresh++
+                    }) { Text("Autoriser AutoTasker dans Shizuku") }
+                }
+                Text(
+                    "Les vérifications d'éligibilité de votre opérateur continuent de " +
+                        "s'appliquer, comme lorsque vous appuyez sur le bouton vous-même.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             SectionCard(
